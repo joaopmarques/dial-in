@@ -17,7 +17,9 @@
     .card:hover { transform: translateY(-4px); }
     .card h2 { margin: 0 0 8px; }
     .card button {
-      margin-top: 16px; border: 0; color: #fff; padding: 10px 16px; border-radius: 8px;
+      margin-top: 16px; border: 0; color: #fff;
+      padding: var(--dial-cta-paddingY, 10px) var(--dial-cta-paddingX, 16px); /* tweak-scaffold */
+      border-radius: var(--dial-cta-radius, 8px); /* tweak-scaffold */
       background: var(--dial-card-accent, #4f46e5); /* tweak-scaffold */
     }
   </style>
@@ -26,7 +28,7 @@
   <article class="card" data-tweak="card"><!-- tweak-scaffold: data-tweak -->
     <h2>Pro plan</h2>
     <p>Everything in Free, plus the knobs you actually want.</p>
-    <button id="cta">Upgrade</button>
+    <button id="cta" data-tweak="cta">Upgrade</button><!-- tweak-scaffold: data-tweak -->
   </article>
   <p id="js-readout" style="position:fixed;bottom:12px;left:12px;font:12px monospace"></p>
   <script>

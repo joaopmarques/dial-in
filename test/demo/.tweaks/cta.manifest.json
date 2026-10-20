@@ -1,0 +1,12 @@
+{
+  "id": "cta",
+  "target": "[data-tweak='cta']",
+  "controls": [
+    { "key": "paddingY", "label": "padding y", "kind": "css", "type": "number", "min": 0, "max": 24, "step": 1, "unit": "px", "value": 10,
+      "source": { "file": "index.html", "line": 22, "raw": "10px" } },
+    { "key": "paddingX", "label": "padding x", "kind": "css", "type": "number", "min": 0, "max": 40, "step": 1, "unit": "px", "value": 16,
+      "source": { "file": "index.html", "line": 22, "raw": "16px" } },
+    { "key": "radius", "kind": "css", "type": "number", "min": 0, "max": 24, "step": 1, "unit": "px", "value": 8,
+      "source": { "file": "index.html", "line": 23, "raw": "8px" } }
+  ]
+}

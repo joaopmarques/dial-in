@@ -1,8 +1,8 @@
 // dial-in panel. A dev-only <script type="module"> tag loads this file from the tweak server.
 //
-// For each manifest in <project>/.tweaks/, it mounts one Tweakpane panel for the element
-// that matches `manifest.target`. The panels float as small resizable windows next to their
-// target, or dock full-size to the left, bottom, or right of the window. Every change shows live and auto-saves.
+// One window holds every manifest in <project>/.tweaks/, one tab per target. The window
+// floats (resizable, placed anywhere) or docks to the left, bottom, or right of the
+// browser window. Every change shows live and auto-saves.
 // "Send to agent" tells the server to exit, which wakes the agent.
 
 const BASE = new URL('.', import.meta.url);
@@ -90,7 +90,9 @@ const DOCK_LABELS = { float: 'Undock into a floating panel', left: 'Dock to left
 // ---------------------------------------------------------------------------
 // Styles
 
-const DOCK_SIZE = 320; // floating width, docked width (left/right) or height (bottom)
+const FLOAT_WIDTH = 360; // default floating width
+const DOCK_SIDE = 360; // docked width, left or right
+const DOCK_BOTTOM = 320; // docked height, bottom
 
 const style = document.createElement('style');
 style.dataset.dialIn = '';
@@ -111,11 +113,11 @@ style.textContent = `
   }
 }
 .dial-in {
-  display: flex; flex-direction: column; width: ${DOCK_SIZE}px; overflow: hidden;
+  position: fixed; z-index: 2147483000; display: flex; flex-direction: column; overflow: hidden;
   font: 12px/1.4 var(--di-font); font-variant-numeric: tabular-nums; color: var(--di-fg);
-  background: var(--di-bg);
+  background: var(--di-bg); box-shadow: var(--di-shadow);
   --tp-base-font-family: var(--di-font);
-  --tp-blade-value-width: 180px;
+  --tp-blade-value-width: 200px;
   --tp-base-background-color: var(--di-bg);
   --tp-base-shadow-color: transparent;
   --tp-button-background-color: var(--di-hover);
@@ -139,34 +141,26 @@ style.textContent = `
   --tp-groove-foreground-color: var(--di-border);
 }
 
-/* Floating: a small window next to the target. Drag it by the header, resize it by the corner. */
+/* Floating: a resizable window, placed anywhere. Drag it by the header, resize it by the corner. */
 .dial-in-host[data-dock="float"] .dial-in {
-  position: fixed; z-index: 2147483000; resize: both;
-  min-width: 260px; min-height: 120px; max-width: calc(100vw - 16px); max-height: calc(100vh - 16px);
-  border: 1px solid var(--di-border); border-radius: 10px; box-shadow: var(--di-shadow);
+  width: ${FLOAT_WIDTH}px; resize: both;
+  min-width: 280px; min-height: 120px; max-width: calc(100vw - 16px); max-height: calc(100vh - 16px);
+  border: 1px solid var(--di-border); border-radius: 10px;
 }
 .dial-in-host[data-dock="float"] .dial-in-foot { padding-bottom: 14px; }
 .dial-in-host[data-dock="float"] .dial-in.is-collapsed { height: auto !important; min-height: 0; resize: none; }
 
-/* Docked: one bar on a window edge, panels stacked inside it. */
-.dial-in-host:not([data-dock="float"]) {
-  position: fixed; z-index: 2147483000; display: flex; overflow: auto;
-  background: var(--di-bg); box-shadow: var(--di-shadow);
+/* Docked: pinned to a browser-window edge, full length. */
+.dial-in-host:not([data-dock="float"]) .dial-in { left: auto; top: auto; right: auto; bottom: auto; }
+.dial-in-host[data-dock="left"] .dial-in, .dial-in-host[data-dock="right"] .dial-in {
+  top: 0; bottom: 0; width: ${DOCK_SIDE}px !important; height: auto !important;
 }
-.dial-in-host[data-dock="left"], .dial-in-host[data-dock="right"] {
-  top: 0; bottom: 0; width: ${DOCK_SIZE}px; flex-direction: column;
-}
-.dial-in-host[data-dock="left"] { left: 0; border-right: 1px solid var(--di-border); }
-.dial-in-host[data-dock="right"] { right: 0; border-left: 1px solid var(--di-border); }
-.dial-in-host[data-dock="bottom"] {
-  left: 0; right: 0; bottom: 0; height: ${DOCK_SIZE}px; flex-direction: row;
+.dial-in-host[data-dock="left"] .dial-in { left: 0; border-right: 1px solid var(--di-border); }
+.dial-in-host[data-dock="right"] .dial-in { right: 0; border-left: 1px solid var(--di-border); }
+.dial-in-host[data-dock="bottom"] .dial-in {
+  left: 0; right: 0; bottom: 0; width: auto !important; height: ${DOCK_BOTTOM}px !important;
   border-top: 1px solid var(--di-border);
 }
-.dial-in-host:not([data-dock="float"]) .dial-in { flex: 1 0 auto; width: auto !important; height: auto !important; }
-.dial-in-host[data-dock="left"] .dial-in + .dial-in,
-.dial-in-host[data-dock="right"] .dial-in + .dial-in { border-top: 1px solid var(--di-border); }
-.dial-in-host[data-dock="bottom"] .dial-in { flex: 1 0 ${DOCK_SIZE}px; height: 100% !important; }
-.dial-in-host[data-dock="bottom"] .dial-in + .dial-in { border-left: 1px solid var(--di-border); }
 
 .dial-in, .dial-in * { box-sizing: border-box; }
 .dial-in button {
@@ -180,7 +174,7 @@ style.textContent = `
 .dial-in .dial-in-icon { padding: 4px; }
 
 .dial-in-head { display: flex; align-items: center; gap: 2px; padding: 6px 6px 6px 12px; user-select: none; }
-.dial-in-title { flex: none; max-width: 120px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dial-in-title { flex: none; max-width: 160px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .dial-in-grip { flex: 1; align-self: stretch; margin: 2px 6px; min-width: 16px; }
 .dial-in-host[data-dock="float"] .dial-in-head { cursor: grab; }
 .dial-in-host[data-dock="float"] .dial-in-head:active { cursor: grabbing; }
@@ -191,7 +185,20 @@ style.textContent = `
 .dial-in-dock { display: flex; }
 .dial-in .dial-in-dock button[aria-checked="true"] { color: var(--di-accent); }
 
-.dial-in-bar { display: flex; align-items: center; gap: 4px; padding: 0 6px 8px 6px; border-bottom: 1px solid var(--di-border); }
+.dial-in-tabs {
+  display: flex; gap: 2px; padding: 0 8px; overflow-x: auto; scrollbar-width: none;
+  border-bottom: 1px solid var(--di-border);
+}
+.dial-in-tabs[hidden] { display: none; }
+.dial-in .dial-in-tabs button { flex: none; border-radius: 0; padding: 6px 8px; margin-bottom: -1px; border-bottom: 2px solid transparent; }
+.dial-in .dial-in-tabs button:hover { background: transparent; }
+.dial-in .dial-in-tabs button[aria-selected="true"] { color: var(--di-fg); border-bottom-color: var(--di-fg); }
+.dial-in .dial-in-tabs button[data-changed]::after { content: "•"; margin-left: 2px; }
+
+.dial-in-sections { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+.dial-in-section { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+.dial-in-section[hidden] { display: none; }
+.dial-in-bar { display: flex; align-items: center; gap: 4px; padding: 8px 6px; border-bottom: 1px solid var(--di-border); }
 .dial-in-ab {
   position: relative; flex: 1; display: grid; grid-template-columns: 1fr 1fr;
   padding: 2px; border-radius: 8px; background: var(--di-subtle);
@@ -208,7 +215,7 @@ style.textContent = `
 .dial-in .dial-in-ab button[aria-checked="true"] { color: var(--di-fg); }
 
 .dial-in-body { flex: 1; min-height: 0; overflow: auto; padding: 4px 0; }
-.dial-in.is-collapsed .dial-in-bar, .dial-in.is-collapsed .dial-in-body,
+.dial-in.is-collapsed .dial-in-tabs, .dial-in.is-collapsed .dial-in-sections,
 .dial-in.is-collapsed .dial-in-foot, .dial-in.is-collapsed .dial-in-note { display: none; }
 .dial-in-note { padding: 6px 12px; color: var(--di-muted); border-top: 1px solid var(--di-border); }
 .dial-in-note:empty { display: none; }
@@ -247,71 +254,225 @@ function iconButton(className, icon, label, text = '') {
   return button;
 }
 
-const outline = h('div', { className: 'dial-in-outline' });
-const host = h('div', { className: 'dial-in-host' });
-document.body.append(outline, host);
+const clampToViewport = (pos, el) => ({
+  left: Math.min(Math.max(pos.left, 8), Math.max(8, window.innerWidth - el.offsetWidth - 8)),
+  top: Math.min(Math.max(pos.top, 8), Math.max(8, window.innerHeight - el.offsetHeight - 8)),
+});
 
 // ---------------------------------------------------------------------------
-// Dock mode. Docking pads the page so the panel never covers it, like DevTools.
+// The window: header (title or tabs, grip, dock, collapse), one section per target, footer.
 
-const docks = new Set(); // every panel's dock switcher, kept in sync
+const saved = readLocal('window') || {};
+let dock = DOCK_MODES.includes(saved.dock) ? saved.dock : 'float';
+let pos = saved.pos || null; // null = not placed yet: anchor next to the active target
+const sections = []; // one per manifest
+let active = null;
+let status = ''; // window-level message (sending, server down); wins over section notes
+
+const outline = h('div', { className: 'dial-in-outline' });
+const host = h('div', { className: 'dial-in-host' });
+
+const title = h('span', { className: 'dial-in-title' });
+const grip = h('span', { className: 'dial-in-grip', title: 'Drag to move' });
+const dockGroup = h('div', { className: 'dial-in-dock' });
+dockGroup.setAttribute('role', 'radiogroup');
+dockGroup.setAttribute('aria-label', 'Dock side');
+const dockButtons = DOCK_MODES.map((m) => {
+  const button = iconButton('dial-in-icon', m, DOCK_LABELS[m]);
+  button.setAttribute('role', 'radio');
+  button.dataset.dock = m;
+  button.addEventListener('click', () => setDock(m));
+  dockGroup.append(button);
+  return button;
+});
+const foldButton = iconButton('dial-in-icon dial-in-fold', 'minus', 'Collapse the panel');
+const head = h('div', { className: 'dial-in-head' }, [title, grip, dockGroup, foldButton]);
+const tabs = h('div', { className: 'dial-in-tabs', hidden: true });
+tabs.setAttribute('role', 'tablist');
+tabs.setAttribute('aria-label', 'Targets');
+const sectionsEl = h('div', { className: 'dial-in-sections' });
+const note = h('div', { className: 'dial-in-note' });
+note.setAttribute('role', 'status');
+const sendButton = h('button', { className: 'dial-in-send', textContent: 'Send to agent', title: 'Send the values to the agent to write into source' });
+const foot = h('div', { className: 'dial-in-foot' }, [sendButton]);
+const root = h('div', { className: 'dial-in' }, [head, tabs, sectionsEl, note, foot]);
+if (saved.size) Object.assign(root.style, { width: `${saved.size.width}px`, height: `${saved.size.height}px` });
+host.append(root);
+document.body.append(outline, host);
+
+const saveWindow = (patch) => patchLocal('window', patch);
+
+function renderNote() {
+  note.textContent = status || (active?.mode() === 'a' ? 'Showing the original. Switch to Tweaked to keep editing.' : '');
+}
+
+function setStatus(message) {
+  status = message;
+  renderNote();
+}
+
+// Dock mode. Docking pads the page so the window never covers it, like DevTools.
 const pageStyle = document.documentElement.style;
 const pagePadding = { left: pageStyle.paddingLeft, right: pageStyle.paddingRight, bottom: pageStyle.paddingBottom };
-let dock = DOCK_MODES.includes(readLocal('dock')) ? readLocal('dock') : 'float';
+const DOCK_PADDING = { left: DOCK_SIDE, right: DOCK_SIDE, bottom: DOCK_BOTTOM };
 
 function setDock(next) {
   dock = next;
   host.dataset.dock = dock;
-  writeLocal('dock', dock);
+  saveWindow({ dock });
   for (const side of ['left', 'right', 'bottom']) {
     const prop = `padding${side[0].toUpperCase()}${side.slice(1)}`;
-    pageStyle[prop] = dock === side ? `${DOCK_SIZE}px` : pagePadding[side];
+    pageStyle[prop] = dock === side ? `${DOCK_PADDING[side]}px` : pagePadding[side];
   }
-  for (const sync of docks) sync();
+  for (const b of dockButtons) b.setAttribute('aria-checked', String(b.dataset.dock === dock));
+  place();
 }
 
-// ---------------------------------------------------------------------------
-// One panel per manifest
+// Floating position. The window opens next to the active target, then stays where the user puts it.
+function anchorPosition() {
+  const target = active && document.querySelector(active.target);
+  if (!target) return null;
+  return placePanel({
+    rect: target.getBoundingClientRect(),
+    panel: { width: root.offsetWidth, height: root.offsetHeight },
+    viewport: { width: window.innerWidth, height: window.innerHeight },
+  });
+}
 
-async function mount(manifest) {
+function place() {
+  if (dock !== 'float') {
+    root.style.left = root.style.top = '';
+    return;
+  }
+  const at = pos ?? anchorPosition() ?? { left: window.innerWidth - root.offsetWidth - 8, top: 8 };
+  const { left, top } = clampToViewport(at, root);
+  root.style.left = `${left}px`;
+  root.style.top = `${top}px`;
+}
+
+// Anchor once, as soon as the target renders (it may render after the panel loads).
+// After that the window stays put: it never follows the target on scroll.
+(function settle() {
+  if (pos) return;
+  const at = dock === 'float' ? anchorPosition() : null;
+  if (at) pos = at;
+  place();
+  if (!pos) requestAnimationFrame(settle);
+})();
+window.addEventListener('resize', place);
+
+// Drag the header to move the floating window anywhere. Double-click it to snap back next to the target.
+head.addEventListener('pointerdown', (ev) => {
+  if (dock !== 'float' || ev.target.closest('button')) return;
+  const start = { x: ev.clientX, y: ev.clientY, left: root.offsetLeft, top: root.offsetTop };
+  head.setPointerCapture(ev.pointerId);
+  const move = (e) => {
+    pos = clampToViewport({ left: start.left + e.clientX - start.x, top: start.top + e.clientY - start.y }, root);
+    place();
+  };
+  const up = () => {
+    head.removeEventListener('pointermove', move);
+    head.removeEventListener('pointerup', up);
+    if (pos) saveWindow({ pos });
+  };
+  head.addEventListener('pointermove', move);
+  head.addEventListener('pointerup', up);
+});
+head.addEventListener('dblclick', (ev) => {
+  if (dock !== 'float' || ev.target.closest('button')) return;
+  pos = anchorPosition();
+  saveWindow({ pos });
+  place();
+});
+
+// Remember the size after the user resizes the floating window by its corner.
+let sizeTimer;
+new ResizeObserver(() => {
+  if (dock !== 'float' || root.classList.contains('is-collapsed') || !root.style.height) return;
+  // Read the inline size the resize handle sets, not the rendered size, so a small browser
+  // window (max-height clamps the panel) does not overwrite the size the user chose.
+  const size = { width: parseFloat(root.style.width), height: parseFloat(root.style.height) };
+  clearTimeout(sizeTimer);
+  sizeTimer = setTimeout(() => saveWindow({ size }), 150);
+}).observe(root);
+
+foldButton.addEventListener('click', () => {
+  const collapsed = root.classList.toggle('is-collapsed');
+  const label = collapsed ? 'Expand the panel' : 'Collapse the panel';
+  foldButton.innerHTML = ICONS[collapsed ? 'plus' : 'minus'];
+  foldButton.title = label;
+  foldButton.setAttribute('aria-label', label);
+});
+
+// Outline the target while the pointer is on its tab, or on the header for the active target.
+let outlined = null;
+function showOutline(section) {
+  outlined = section;
+  (function follow() {
+    if (outlined !== section) return;
+    const target = document.querySelector(section.target);
+    if (target) {
+      const r = target.getBoundingClientRect();
+      Object.assign(outline.style, { display: 'block', left: `${r.left}px`, top: `${r.top}px`, width: `${r.width}px`, height: `${r.height}px` });
+    } else {
+      outline.style.display = 'none';
+    }
+    requestAnimationFrame(follow);
+  })();
+}
+function hideOutline() {
+  outlined = null;
+  outline.style.display = 'none';
+}
+head.addEventListener('pointerenter', () => active && showOutline(active));
+head.addEventListener('pointerleave', hideOutline);
+
+function activate(section) {
+  active = section;
+  for (const s of sections) {
+    s.el.hidden = s !== section;
+    s.tab.setAttribute('aria-selected', String(s === section));
+    s.tab.tabIndex = s === section ? 0 : -1;
+  }
+  title.textContent = sections.length > 1 ? 'dial-in' : section.id;
+  title.title = sections.length > 1 ? '' : section.target;
+  saveWindow({ active: section.id });
+  renderNote();
+}
+
+tabs.addEventListener('keydown', (ev) => {
+  if (ev.key !== 'ArrowLeft' && ev.key !== 'ArrowRight') return;
+  ev.preventDefault();
+  const i = sections.indexOf(active) + (ev.key === 'ArrowRight' ? 1 : -1);
+  const next = sections[(i + sections.length) % sections.length];
+  activate(next);
+  next.tab.focus();
+});
+
+// ---------------------------------------------------------------------------
+// One section (and tab) per manifest
+
+async function addSection(manifest) {
   const { id, controls } = manifest;
   const originals = originalsOf(controls);
   const signature = JSON.stringify(originals);
 
   // Restore earlier tweaks, unless the agent scaffolded new original values since.
-  // The panel position is kept either way.
-  const saved = readLocal(id) || {};
-  let stored = saved.signature === signature ? saved.values : null;
+  const local = readLocal(id) || {};
+  let stored = local.signature === signature ? local.values : null;
   if (!stored) {
     stored = await api(`/values/${id}`)
       .then((r) => (r.signature === signature ? r.values : null))
       .catch(() => null);
   }
   const params = startValues(originals, stored);
-
   let mode = 'b'; // b = tweaked, a = original
-  let pos = saved.pos || null;
-  let target = null;
 
-  // Header: title, drag grip, dock switcher, collapse.
-  const title = h('span', { className: 'dial-in-title', textContent: id, title: manifest.target });
-  const grip = h('span', { className: 'dial-in-grip', title: 'Drag to move' });
-  const dockGroup = h('div', { className: 'dial-in-dock' });
-  dockGroup.setAttribute('role', 'radiogroup');
-  dockGroup.setAttribute('aria-label', 'Dock side');
-  const dockButtons = DOCK_MODES.map((m) => {
-    const button = iconButton('dial-in-icon', m, DOCK_LABELS[m]);
-    button.setAttribute('role', 'radio');
-    button.dataset.dock = m;
-    button.addEventListener('click', () => setDock(m));
-    dockGroup.append(button);
-    return button;
-  });
-  const syncDock = () => dockButtons.forEach((b) => b.setAttribute('aria-checked', String(b.dataset.dock === dock)));
-  docks.add(syncDock);
-  syncDock();
-  const foldButton = iconButton('dial-in-icon dial-in-fold', 'minus', 'Collapse the panel');
-  const head = h('div', { className: 'dial-in-head' }, [title, grip, dockGroup, foldButton]);
+  const tab = h('button', { textContent: id, title: manifest.target });
+  tab.setAttribute('role', 'tab');
+  tab.id = `dial-in-tab-${id}`;
+  tab.setAttribute('aria-controls', `dial-in-section-${id}`);
+  tabs.append(tab);
 
   // Toolbar: Original / Tweaked toggle, Reset, JSON.
   const originalOption = h('button', { textContent: 'Original', title: 'Show the original values' });
@@ -326,28 +487,13 @@ async function mount(manifest) {
   const resetButton = iconButton('dial-in-reset', 'reset', 'Reset every control to its original value', 'Reset');
   const copyButton = iconButton('dial-in-copy', 'copy', 'Copy the values as JSON, to paste in chat', 'JSON');
   const bar = h('div', { className: 'dial-in-bar' }, [abToggle, resetButton, copyButton]);
-
   const body = h('div', { className: 'dial-in-body' });
-  const note = h('div', { className: 'dial-in-note' });
-  const sendButton = h('button', { className: 'dial-in-send', textContent: 'Send to agent', title: 'Send the values to the agent to write into source' });
-  const foot = h('div', { className: 'dial-in-foot' }, [sendButton]);
-  const root = h('div', { className: 'dial-in' }, [head, bar, body, note, foot]);
-  root.dataset.dialInPanel = id;
-  if (saved.size) Object.assign(root.style, { width: `${saved.size.width}px`, height: `${saved.size.height}px` });
-  host.append(root);
+  const el = h('div', { className: 'dial-in-section', id: `dial-in-section-${id}` }, [bar, body]);
+  el.dataset.dialInPanel = id;
+  el.setAttribute('role', 'tabpanel');
+  el.setAttribute('aria-labelledby', tab.id);
+  sectionsEl.append(el);
 
-  // Remember the size after the user resizes a floating panel by its corner.
-  let sizeTimer;
-  new ResizeObserver(() => {
-    if (dock !== 'float' || root.classList.contains('is-collapsed') || !root.style.height) return;
-    clearTimeout(sizeTimer);
-    // Read the inline size the resize handle sets, not the rendered size, so a small window
-    // (max-height clamps the panel) does not overwrite the size the user chose.
-    const size = { width: parseFloat(root.style.width), height: parseFloat(root.style.height) };
-    sizeTimer = setTimeout(() => patchLocal(id, { size }), 150);
-  }).observe(root);
-
-  // Pane
   const pane = new Pane({ container: body });
   pane.registerPlugin(Essentials);
   const views = {};
@@ -363,7 +509,7 @@ async function mount(manifest) {
         params[key] = ev.value.toObject();
         changed();
       });
-      // Preset curves under the editor.
+      // Preset curves, inside the blade's value column so Tweakpane's own row order stays intact.
       const presets = h('div', { className: 'dial-in-presets' });
       presets.setAttribute('role', 'group');
       presets.setAttribute('aria-label', `${label} presets`);
@@ -373,11 +519,10 @@ async function mount(manifest) {
         button.addEventListener('click', () => (view.value = new Essentials.CubicBezier(...preset.value)));
         presets.append(button);
       }
-      // Inside the blade's value column, so Tweakpane's own row order stays intact.
       (view.element.querySelector('.tp-lblv_v') ?? view.element).append(presets);
       const sync = () => {
-        const active = matchPreset(params[key]);
-        for (const b of presets.children) b.setAttribute('aria-pressed', String(b.dataset.preset === active));
+        const current = matchPreset(params[key]);
+        for (const b of presets.children) b.setAttribute('aria-pressed', String(b.dataset.preset === current));
       };
       presetSyncs.push(sync);
       sync();
@@ -410,11 +555,15 @@ async function mount(manifest) {
     }
   }
 
-  // Mark changed controls with a dot so the delta is visible without the toggle.
+  // Mark changed controls (and the tab) with a dot so the delta is visible without the toggle.
   function markChanged() {
+    let any = false;
     for (const { view, label, control } of Object.values(views)) {
-      view.label = same(params[control.key], originals[control.key]) ? label : `${label} •`;
+      const isSame = same(params[control.key], originals[control.key]);
+      any ||= !isSame;
+      view.label = isSame ? label : `${label} •`;
     }
+    tab.toggleAttribute('data-changed', any);
     for (const sync of presetSyncs) sync();
   }
 
@@ -425,7 +574,7 @@ async function mount(manifest) {
     saveTimer = setTimeout(() => {
       if (sent) return;
       api(`/values/${id}`, { values: params, signature }).catch(() => {
-        if (!sent) note.textContent = 'Tweak server unreachable. Values are kept in this browser.';
+        if (!sent) setStatus('Tweak server unreachable. Values are kept in this browser.');
       });
     }, 300);
   }
@@ -443,9 +592,9 @@ async function mount(manifest) {
     tweakedOption.setAttribute('aria-checked', String(mode === 'b'));
     originalOption.tabIndex = mode === 'a' ? 0 : -1;
     tweakedOption.tabIndex = mode === 'b' ? 0 : -1;
-    pane.disabled = mode === 'a';
-    note.textContent = mode === 'a' ? 'Showing the original. Switch to Tweaked to keep editing.' : '';
+    pane.disabled = mode === 'a' || sent;
     applyToPage(id, controls, mode === 'a' ? originals : params);
+    renderNote();
   }
 
   function reset() {
@@ -462,119 +611,59 @@ async function mount(manifest) {
   abToggle.addEventListener('keydown', (ev) => {
     if (ev.key !== 'ArrowLeft' && ev.key !== 'ArrowRight') return;
     ev.preventDefault();
+    ev.stopPropagation();
     setMode(ev.key === 'ArrowLeft' ? 'a' : 'b');
     (mode === 'a' ? originalOption : tweakedOption).focus();
   });
   resetButton.addEventListener('click', reset);
-  foldButton.addEventListener('click', () => {
-    const collapsed = root.classList.toggle('is-collapsed');
-    const label = collapsed ? 'Expand the panel' : 'Collapse the panel';
-    foldButton.innerHTML = ICONS[collapsed ? 'plus' : 'minus'];
-    foldButton.title = label;
-    foldButton.setAttribute('aria-label', label);
-  });
   copyButton.addEventListener('click', async () => {
     await navigator.clipboard.writeText(JSON.stringify({ id, values: params }, null, 2));
     copyButton.innerHTML = `${ICONS.check}<span>Copied</span>`;
     setTimeout(() => (copyButton.innerHTML = `${ICONS.copy}<span>JSON</span>`), 1200);
   });
-  sendButton.addEventListener('click', sendAll);
 
-  // Dragging the header moves a floating panel. Double-click the header to snap back.
-  head.addEventListener('pointerdown', (ev) => {
-    if (dock !== 'float' || ev.target.closest('button')) return;
-    const start = { x: ev.clientX, y: ev.clientY, left: root.offsetLeft, top: root.offsetTop };
-    head.setPointerCapture(ev.pointerId);
-    const move = (e) => {
-      pos = { left: start.left + e.clientX - start.x, top: start.top + e.clientY - start.y };
-      place();
-    };
-    const up = () => {
-      head.removeEventListener('pointermove', move);
-      head.removeEventListener('pointerup', up);
-      if (pos) patchLocal(id, { pos });
-    };
-    head.addEventListener('pointermove', move);
-    head.addEventListener('pointerup', up);
-  });
-  head.addEventListener('dblclick', (ev) => {
-    if (dock !== 'float' || ev.target.closest('button')) return;
-    pos = null;
-    patchLocal(id, { pos: null });
-  });
-
-  // Show which element this panel tweaks.
-  head.addEventListener('pointerenter', () => (outline.dataset.for = id));
-  head.addEventListener('pointerleave', () => delete outline.dataset.for);
-
-  // Follow the target through scroll, resize, and hot reloads.
-  function place() {
-    if (!target?.isConnected) target = document.querySelector(manifest.target);
-    root.style.display = target ? '' : 'none';
-    if (dock === 'float' && (pos || target)) {
-      const { left, top } = placePanel({
-        rect: target?.getBoundingClientRect(),
-        panel: { width: root.offsetWidth, height: root.offsetHeight },
-        viewport: { width: window.innerWidth, height: window.innerHeight },
-        dragged: pos,
-      });
-      root.style.left = `${left}px`;
-      root.style.top = `${top}px`;
-    } else {
-      root.style.left = '';
-      root.style.top = '';
-    }
-    if (target && outline.dataset.for === id) {
-      const r = target.getBoundingClientRect();
-      Object.assign(outline.style, { display: 'block', left: `${r.left}px`, top: `${r.top}px`, width: `${r.width}px`, height: `${r.height}px` });
-    } else if (!outline.dataset.for) {
-      outline.style.display = 'none';
-    }
-  }
-  (function loop() {
-    place();
-    requestAnimationFrame(loop);
-  })();
-
-  store.panels.push({
+  const section = {
     id,
+    target: manifest.target,
+    el,
+    tab,
+    mode: () => mode,
     values: () => clone(params),
     cancelSave: () => clearTimeout(saveTimer),
-    lock(message) {
-      root.classList.add('is-done');
-      pane.disabled = true;
-      note.textContent = message;
-    },
-    unlock(message) {
-      root.classList.remove('is-done');
-      pane.disabled = mode === 'a';
-      note.textContent = message;
-    },
-  });
+    setDisabled: (disabled) => (pane.disabled = disabled || mode === 'a'),
+  };
+  tab.addEventListener('click', () => activate(section));
+  tab.addEventListener('pointerenter', () => showOutline(section));
+  tab.addEventListener('pointerleave', hideOutline);
+  sections.push(section);
+  store.panels.push(section);
 
   markChanged();
   setMode('b');
 }
 
-// "Send to agent" sends every panel on the page at once.
+// "Send to agent" sends every target at once.
 let sent = false;
 async function sendAll() {
   if (sent) return;
   sent = true;
-  for (const panel of store.panels) panel.cancelSave();
+  for (const s of sections) s.cancelSave();
   try {
     await api('/confirm', { values: store.export() });
-    for (const panel of store.panels) panel.lock('Sent to agent ✓ The agent is writing your values.');
+    root.classList.add('is-done');
+    for (const s of sections) s.setDisabled(true);
+    setStatus('Sent to agent ✓ The agent is writing your values.');
   } catch (err) {
     sent = false;
     // fetch() throws a TypeError when nothing listens on the port: the server has stopped.
-    const message =
+    setStatus(
       err instanceof TypeError
         ? 'The tweak server is not running, so the agent cannot get your values. Click JSON and paste them in chat.'
-        : `The tweak server refused the values (${err.message}). Click JSON and paste them in chat.`;
-    for (const panel of store.panels) panel.unlock(message);
+        : `The tweak server refused the values (${err.message}). Click JSON and paste them in chat.`,
+    );
   }
 }
+sendButton.addEventListener('click', sendAll);
 
 // ---------------------------------------------------------------------------
 
@@ -583,7 +672,14 @@ const manifests = await api('/manifests').catch((err) => {
   console.warn('[dial-in] Could not load manifests:', err);
   return [];
 });
-if (!manifests.length) console.warn('[dial-in] No manifests in .tweaks/. Nothing to dial in.');
-for (const manifest of manifests) await mount(manifest);
+if (!manifests.length) {
+  console.warn('[dial-in] No manifests in .tweaks/. Nothing to dial in.');
+  host.remove();
+} else {
+  for (const manifest of manifests) await addSection(manifest);
+  tabs.hidden = sections.length < 2;
+  activate(sections.find((s) => s.id === saved.active) ?? sections[0]);
+  place();
+}
 store.ready = true;
 window.dispatchEvent(new CustomEvent('dial-in:ready'));

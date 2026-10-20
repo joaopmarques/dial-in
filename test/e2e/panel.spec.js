@@ -29,7 +29,10 @@ const test = base.extend({
   },
 });
 
-const panel = (page, id = 'card') => page.locator(`.dial-in[data-dial-in-panel="${id}"]`);
+// The window. With one target, its rows sit directly inside it.
+const panel = (page) => page.locator('.dial-in');
+// One target's tab panel.
+const section = (page, id) => page.locator(`[data-dial-in-panel="${id}"]`);
 const row = (page, label) =>
   panel(page).locator('.tp-lblv').filter({ has: page.locator('.tp-lblv_l', { hasText: label }) });
 const rootVar = (page, name) =>
@@ -53,7 +56,7 @@ test.describe('mounting', () => {
     const box = await panel(page).boundingBox();
     expect(box.x).toBeCloseTo(card.x + card.width + 12, 0);
     expect(box.y).toBeCloseTo(card.y, 0);
-    expect(box.width).toBe(320);
+    expect(box.width).toBe(360);
     expect(box.height).toBeLessThan(page.viewportSize().height - 100);
     await expect(panel(page)).toHaveCSS('border-radius', '10px');
     await expect(panel(page)).toHaveCSS('resize', 'both');
@@ -62,24 +65,69 @@ test.describe('mounting', () => {
     }
   });
 
-  test('mounts several panels and "Send to agent" sends all of them', async ({ page, dial }) => {
+  test('shows one tab per target and switches between them', async ({ page, dial }) => {
     await dial.open({
       manifests: [cardManifest(), cardManifest({ id: 'hero', target: '#hero' })],
       body: `<article class="card" data-tweak="card">Card</article><div id="hero" style="position:absolute;left:40px;top:500px;width:100px;height:50px">Hero</div>`,
     });
-    await expect(page.locator('.dial-in')).toHaveCount(2);
-    await panel(page, 'hero').getByRole('button', { name: 'Send to agent' }).click();
+    await expect(page.locator('.dial-in')).toHaveCount(1);
+    const tabs = panel(page).getByRole('tab');
+    await expect(tabs).toHaveText(['card', 'hero']);
+    await expect(panel(page).getByRole('tab', { name: 'card' })).toHaveAttribute('aria-selected', 'true');
+    await expect(section(page, 'card')).toBeVisible();
+    await expect(section(page, 'hero')).toBeHidden();
+
+    await panel(page).getByRole('tab', { name: 'hero' }).click();
+    await expect(section(page, 'hero')).toBeVisible();
+    await expect(section(page, 'card')).toBeHidden();
+
+    await panel(page).getByRole('tab', { name: 'hero' }).focus();
+    await page.keyboard.press('ArrowLeft');
+    await expect(panel(page).getByRole('tab', { name: 'card' })).toHaveAttribute('aria-selected', 'true');
+  });
+
+  test('a tab gets a dot once its target has changes, and the active tab is remembered', async ({ page, dial }) => {
+    await dial.open({
+      manifests: [cardManifest(), cardManifest({ id: 'hero', target: '#hero' })],
+      body: `<article class="card" data-tweak="card">Card</article><div id="hero">Hero</div>`,
+    });
+    await panel(page).getByRole('tab', { name: 'hero' }).click();
+    const input = section(page, 'hero').locator('.tp-lblv').filter({ hasText: 'padding' }).locator('input').last();
+    await input.fill('30');
+    await input.press('Enter');
+    await expect(panel(page).getByRole('tab', { name: 'hero' })).toHaveAttribute('data-changed', '');
+    await expect(panel(page).getByRole('tab', { name: 'card' })).not.toHaveAttribute('data-changed', '');
+    await page.reload();
+    await page.waitForFunction(() => window.__dialIn?.ready);
+    await expect(panel(page).getByRole('tab', { name: 'hero' })).toHaveAttribute('aria-selected', 'true');
+  });
+
+  test('one target shows its name as the title and no tab row', async ({ page, dial }) => {
+    await dial.open();
+    await expect(panel(page).locator('.dial-in-title')).toHaveText('card');
+    await expect(panel(page).getByRole('tablist')).toBeHidden();
+  });
+
+  test('"Send to agent" sends every target', async ({ page, dial }) => {
+    await dial.open({
+      manifests: [cardManifest(), cardManifest({ id: 'hero', target: '#hero' })],
+      body: `<article class="card" data-tweak="card">Card</article><div id="hero">Hero</div>`,
+    });
+    await panel(page).getByRole('button', { name: 'Send to agent' }).click();
     const { stdout } = await dial.server.exited;
     expect(stdout).toMatch(/"ids":\["card","hero"\]|"ids":\["hero","card"\]/);
   });
 
-  test('hides the panel while the target is missing and shows it once the target renders', async ({ page, dial }) => {
+  test('opens in a corner while the target is missing, then anchors next to it once it renders', async ({ page, dial }) => {
     await dial.open({ body: '<div id="slot"></div>' });
-    await expect(panel(page)).toBeHidden();
+    await expect(panel(page)).toBeVisible();
+    const corner = await panel(page).boundingBox();
+    expect(corner.x + corner.width).toBeCloseTo(page.viewportSize().width - 8, 0);
     await page.evaluate(() => {
       document.getElementById('slot').innerHTML = '<article class="card" data-tweak="card">Late</article>';
     });
-    await expect(panel(page)).toBeVisible();
+    const card = await page.locator('.card').boundingBox();
+    await expect.poll(async () => (await panel(page).boundingBox()).x).toBeCloseTo(card.x + card.width + 12, 0);
   });
 });
 
@@ -286,6 +334,7 @@ test.describe('easing presets', () => {
 
 test.describe('docking', () => {
   const host = (page) => page.locator('.dial-in-host');
+  const SIZE = { Right: 360, Left: 360, Bottom: 320 };
   const dockButton = (page, name) => panel(page).getByRole('radio', { name });
   const pagePadding = (page, side) => page.evaluate((s) => document.documentElement.style[`padding${s}`], side);
 
@@ -306,8 +355,8 @@ test.describe('docking', () => {
       await dockButton(page, name).click();
       await expect(dockButton(page, name)).toHaveAttribute('aria-checked', 'true');
       await expect(host(page)).toHaveAttribute('data-dock', edge);
-      expect(await pagePadding(page, side)).toBe('320px');
-      const box = await host(page).boundingBox();
+      expect(await pagePadding(page, side)).toBe(`${SIZE[side]}px`);
+      const box = await panel(page).boundingBox();
       const { width, height } = page.viewportSize();
       if (edge === 'right') expect(box.x + box.width).toBeCloseTo(width, 0);
       if (edge === 'left') expect(box.x).toBe(0);
@@ -330,7 +379,7 @@ test.describe('docking', () => {
     await page.waitForFunction(() => window.__dialIn?.ready);
     await page.evaluate(() => (document.documentElement.style.paddingRight = ''));
     await dockButton(page, 'Dock to right').click();
-    expect(await pagePadding(page, 'Right')).toBe('320px');
+    expect(await pagePadding(page, 'Right')).toBe('360px');
     await dockButton(page, 'Undock into a floating panel').click();
     expect(await pagePadding(page, 'Right')).toBe('');
     await expect(host(page)).toHaveAttribute('data-dock', 'float');
@@ -342,20 +391,7 @@ test.describe('docking', () => {
     await page.reload();
     await page.waitForFunction(() => window.__dialIn?.ready);
     await expect(host(page)).toHaveAttribute('data-dock', 'left');
-    expect(await pagePadding(page, 'Left')).toBe('320px');
-  });
-
-  test('docked panels stack in one bar and switch together', async ({ page, dial }) => {
-    await dial.open({
-      manifests: [cardManifest(), cardManifest({ id: 'hero', target: '#hero' })],
-      body: `<article class="card" data-tweak="card">Card</article><div id="hero">Hero</div>`,
-    });
-    await panel(page, 'hero').getByRole('radio', { name: 'Dock to right' }).click();
-    await expect(panel(page, 'card').getByRole('radio', { name: 'Dock to right' })).toHaveAttribute('aria-checked', 'true');
-    const a = await panel(page, 'card').boundingBox();
-    const b = await panel(page, 'hero').boundingBox();
-    expect(a.x).toBeCloseTo(b.x, 0);
-    expect(b.y).toBeGreaterThanOrEqual(a.y + a.height - 1);
+    expect(await pagePadding(page, 'Left')).toBe('360px');
   });
 
   test('a docked panel does not drag and shows no grip', async ({ page, dial }) => {
@@ -445,6 +481,30 @@ test.describe('panel chrome', () => {
     await expect.poll(async () => (await panel(page).boundingBox()).x).toBeCloseTo(anchored.x, 0);
   });
 
+  test('the window can go anywhere, even far from the target', async ({ page, dial }) => {
+    await dial.open();
+    const t = await panel(page).locator('.dial-in-title').boundingBox();
+    const { width, height } = page.viewportSize();
+    await page.mouse.move(t.x + 5, t.y + 5);
+    await page.mouse.down();
+    await page.mouse.move(width - 100, height - 60, { steps: 8 });
+    await page.mouse.up();
+    const box = await panel(page).boundingBox();
+    // Dropped at the far bottom-right corner, clamped 8px inside the viewport.
+    expect(box.x + box.width).toBeCloseTo(width - 8, 0);
+    expect(box.y + box.height).toBeCloseTo(height - 8, 0);
+  });
+
+  test('the window stays put when the page scrolls', async ({ page, dial }) => {
+    await dial.open({ body: `<article class="card" data-tweak="card">Card</article><div style="height:3000px"></div>` });
+    const before = await panel(page).boundingBox();
+    await page.mouse.wheel(0, 600);
+    await page.waitForTimeout(100);
+    const after = await panel(page).boundingBox();
+    expect(after.x).toBe(before.x);
+    expect(after.y).toBe(before.y);
+  });
+
   test('the corner handle resizes the floating window, and the size is remembered', async ({ page, dial }) => {
     await dial.open();
     const before = await panel(page).boundingBox();
@@ -470,7 +530,7 @@ test.describe('panel chrome', () => {
     await panel(page).evaluate((el) => Object.assign(el.style, { width: '400px', height: '250px' }));
     await panel(page).getByRole('radio', { name: 'Dock to right' }).click();
     const docked = await panel(page).boundingBox();
-    expect(docked.width).toBeCloseTo(320, 0);
+    expect(docked.width).toBeCloseTo(360, 0);
     expect(docked.height).toBeCloseTo(page.viewportSize().height, 0);
     await expect(panel(page)).toHaveCSS('border-radius', '0px');
     await panel(page).getByRole('radio', { name: 'Undock into a floating panel' }).click();

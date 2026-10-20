@@ -6,9 +6,9 @@ Ask Claude to dial in a component. A panel of live controls opens next to it in 
 
 ## What it does
 
-1. **Discover:** Claude picks up to 8 knobs from the component and from what you talked about: spacing, colors, radius, shadows, easing, durations, springs.
+1. **Discover:** Claude picks 3 to 6 knobs from what you talked about: spacing, colors, radius, shadows, easing, durations, springs. Ask for "all controls" to pick from the full list, or ask for more knobs at any time.
 2. **Scaffold:** Claude makes those values live, starts a small local server, and opens the page.
-3. **Tweak:** a small floating [Tweakpane](https://tweakpane.github.io/docs/) window sits next to the component. Drag it by its dotted header and resize it by the corner. Or dock it to the left, bottom, or right of the window, like DevTools. It follows your system's light or dark theme. Every change shows live and auto-saves, so a hot reload loses nothing.
+3. **Tweak:** a floating [Tweakpane](https://tweakpane.github.io/docs/) window opens next to the component, with one tab per component when there are several. Drag it anywhere by its dotted header and resize it by the corner: it stays where you put it. Or dock it to the left, bottom, or right of the browser window, like DevTools. It follows your system's light or dark theme. Every change shows live and auto-saves, so a hot reload loses nothing.
    - A tick on each slider marks the original value.
    - The **Original / Tweaked** toggle flips between the two, so you can compare.
    - A `•` marks every control you changed.
