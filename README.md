@@ -1,4 +1,4 @@
-# dial-in
+# 👌 dial-in
 
 A Claude Code skill for the last 5% of a component. Some details you can only get right by eye: the radius, the shadow, the spring. Prompting for them one guess at a time is slow. Dial-in gives you sliders instead.
 
