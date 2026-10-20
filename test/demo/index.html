@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>dial-in demo</title>
+  <style>
+    body { margin: 0; min-height: 100vh; display: grid; place-items: center; background: #f4f4f5; font-family: system-ui, sans-serif; }
+    .card {
+      width: 320px;
+      padding: var(--dial-card-padding, 24px); /* tweak-scaffold */
+      border-radius: var(--dial-card-radius, 12px); /* tweak-scaffold */
+      background: #fff;
+      box-shadow: 0 var(--dial-card-shadowY, 8px) 24px rgba(0, 0, 0, 0.12); /* tweak-scaffold */
+      transition: transform 400ms var(--dial-card-ease, cubic-bezier(0.2, 0.8, 0.2, 1)); /* tweak-scaffold */
+    }
+    .card:hover { transform: translateY(-4px); }
+    .card h2 { margin: 0 0 8px; }
+    .card button {
+      margin-top: 16px; border: 0; color: #fff; padding: 10px 16px; border-radius: 8px;
+      background: var(--dial-card-accent, #4f46e5); /* tweak-scaffold */
+    }
+  </style>
+</head>
+<body>
+  <article class="card" data-tweak="card"><!-- tweak-scaffold: data-tweak -->
+    <h2>Pro plan</h2>
+    <p>Everything in Free, plus the knobs you actually want.</p>
+    <button id="cta">Upgrade</button>
+  </article>
+  <p id="js-readout" style="position:fixed;bottom:12px;left:12px;font:12px monospace"></p>
+  <script>
+    // JS value demo: a duration read through __tweak.
+    const readout = () => {
+      const ms = globalThis.__tweak?.('card', 'pressMs', 120) ?? 120; // tweak-scaffold
+      document.getElementById('js-readout').textContent = `pressMs = ${ms}`;
+    };
+    readout();
+    window.addEventListener('tweak', readout); // tweak-scaffold
+  </script>
+  <script type="module" src="http://127.0.0.1:7777/panel.js"></script><!-- tweak-scaffold -->
+</body>
+</html>

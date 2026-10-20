@@ -1,0 +1,7 @@
+# Runtime state from the demo. The manifest is a fixture and stays tracked.
+test/demo/.tweaks/*
+!test/demo/.tweaks/*.manifest.json
+.DS_Store
+node_modules/
+test-results/
+playwright-report/

@@ -1,0 +1,18 @@
+{
+  "id": "card",
+  "target": "[data-tweak='card']",
+  "controls": [
+    { "key": "padding", "kind": "css", "type": "number", "min": 0, "max": 48, "step": 1, "unit": "px", "value": 24,
+      "source": { "file": "index.html", "line": 10, "raw": "24px" } },
+    { "key": "radius", "kind": "css", "type": "number", "min": 0, "max": 32, "step": 1, "unit": "px", "value": 12,
+      "source": { "file": "index.html", "line": 11, "raw": "12px" } },
+    { "key": "shadowY", "label": "shadow y", "kind": "css", "type": "number", "min": 0, "max": 32, "step": 1, "unit": "px", "value": 8,
+      "source": { "file": "index.html", "line": 13, "raw": "8px" } },
+    { "key": "accent", "kind": "css", "type": "color", "value": "#4f46e5",
+      "source": { "file": "index.html", "line": 22, "raw": "#4f46e5" } },
+    { "key": "ease", "kind": "css", "type": "cubic-bezier", "value": [0.2, 0.8, 0.2, 1],
+      "source": { "file": "index.html", "line": 14, "raw": "cubic-bezier(0.2, 0.8, 0.2, 1)" } },
+    { "key": "pressMs", "label": "press ms", "kind": "js", "type": "number", "min": 0, "max": 400, "step": 10, "value": 120,
+      "source": { "file": "index.html", "line": 34, "raw": "120" } }
+  ]
+}
