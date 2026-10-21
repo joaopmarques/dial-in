@@ -91,3 +91,20 @@ describe('dial.mjs teardown without git', () => {
     assert.equal(result.status, 0, result.stdout);
   });
 });
+
+describe('dial.mjs teardown ignores installed copies of the skill', () => {
+  for (const withGit of [true, false]){
+    test(`skill files inside the project are not leftovers (${withGit ? 'git' : 'no git'})`, async () => {
+      const p = await makeProject();
+      if (withGit) execFileSync('git', ['init', '-q'], { cwd: p.root });
+      for (const dir of ['.claude/skills/dial-in', '.agents/skills/dial-in']){
+        await mkdir(join(p.root, dir), { recursive: true });
+        await writeFile(join(p.root, dir, 'SKILL.md'), 'Tag every line with tweak-scaffold and data-tweak.\n');
+      }
+      const result = run(p.root, 'teardown');
+      await p.cleanup();
+      assert.equal(result.status, 0, result.stdout);
+      assert.match(result.stdout, /clean/);
+    });
+  }
+});

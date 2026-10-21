@@ -69,7 +69,8 @@ async function teardown() {
   console.log('deleted .tweaks/');
 
   // 3. Search the project for leftovers: git grep in a repo, a plain file walk otherwise.
-  const hits = gitGrep() ?? (await walkGrep(root));
+  // The skill's own files mention the markers; skip any installed copy (.claude/skills/dial-in, .agents/skills/dial-in…).
+  const hits = (gitGrep() ?? (await walkGrep(root))).split('\n').filter((l) => l && !OWN_FILES.test(l)).join('\n');
   if (hits.trim()) {
     console.log(`leftovers to remove:\n${hits.trim()}`);
     process.exit(1);
@@ -78,6 +79,7 @@ async function teardown() {
 }
 
 const LEFTOVER = /tweak-scaffold|--dial-|__tweak|data-tweak/;
+const OWN_FILES = /^(?:.*\/)?skills\/dial-in\//;
 
 // Leftover lines as "file:line:text", or null when git cannot search here (not a repo, or git missing).
 function gitGrep(){

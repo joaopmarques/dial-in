@@ -1,7 +1,7 @@
 {
   "name": "dial-in",
   "displayName": "Dial In",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "description": "Dial in a UI component by hand: a floating panel of live controls next to the component, then Claude writes your values back to source.",
   "author": {
     "name": "João P. Marques",
