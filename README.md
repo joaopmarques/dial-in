@@ -4,6 +4,8 @@ A Claude Code skill for the last 5% of a component. Some details you can only ge
 
 Ask Claude to dial in a component. A panel of live controls opens next to it in your running app. Drag until it feels right, click **Send to agent**, and Claude writes the values back to source.
 
+Watch the 27-second demo: [docs/media/dial-in-promo.mp4](docs/media/dial-in-promo.mp4).
+
 ## What it does
 
 1. **Discover:** Claude picks 3 to 6 knobs from what you talked about: spacing, colors, radius, shadows, easing, durations, springs. Ask for "all controls" to pick from the full list, or ask for more knobs at any time.

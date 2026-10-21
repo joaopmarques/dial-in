@@ -1,0 +1,13 @@
+{
+  "name": "dial-in-promo",
+  "private": true,
+  "description": "Promo video for dial-in, made with the motion-graphic skill (vendored in .skill).",
+  "scripts": {
+    "build": "python3 build.py",
+    "check": "NODE_PATH=node_modules node .skill/scripts/check.js dial-in-promo.html --out check",
+    "record": "NODE_PATH=node_modules node .skill/scripts/record.js dial-in-promo.html --out ../docs/media/dial-in-promo.mp4 --fps 120 --no-bar"
+  },
+  "devDependencies": {
+    "puppeteer-core": "23.11.1"
+  }
+}
