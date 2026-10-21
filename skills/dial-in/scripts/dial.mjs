@@ -5,7 +5,7 @@
 //   node dial.mjs teardown --root <project>   Stop the server, delete .tweaks/ state, list scaffold leftovers.
 //                                             Exit 1 while leftovers remain.
 
-import { readFile, readdir, rm } from 'node:fs/promises';
+import { readFile, readdir, rm, stat } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { execFileSync } from 'node:child_process';
@@ -68,22 +68,44 @@ async function teardown() {
   await rm(tweaksDir, { recursive: true, force: true });
   console.log('deleted .tweaks/');
 
-  // 3. Search tracked and untracked files for leftovers.
-  let hits = '';
-  try {
-    hits = execFileSync(
-      'git',
-      ['grep', '-n', '--untracked', '-E', 'tweak-scaffold|--dial-|__tweak|data-tweak', '--', '.', ':!node_modules'],
-      { cwd: root, encoding: 'utf8' },
-    );
-  } catch (err) {
-    if (err.status !== 1) throw err; // 1 = no matches
-  }
+  // 3. Search the project for leftovers: git grep in a repo, a plain file walk otherwise.
+  const hits = gitGrep() ?? (await walkGrep(root));
   if (hits.trim()) {
     console.log(`leftovers to remove:\n${hits.trim()}`);
     process.exit(1);
   }
   console.log('clean: no scaffold left');
+}
+
+const LEFTOVER = /tweak-scaffold|--dial-|__tweak|data-tweak/;
+
+// Leftover lines as "file:line:text", or null when git cannot search here (not a repo, or git missing).
+function gitGrep(){
+  try {
+    return execFileSync('git', ['grep', '-n', '--untracked', '-E', LEFTOVER.source, '--', '.', ':!node_modules'],
+      { cwd: root, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] });
+  } catch (err) {
+    return err.status === 1 ? '' : null;   // 1 = searched, no matches
+  }
+}
+
+// The same search without git: every text file under root, skipping dependency and build folders.
+const SKIP_DIRS = new Set(['node_modules', '.git', 'dist', 'build', '.next', '.nuxt', '.svelte-kit', '.output', 'coverage', '.tweaks']);
+async function walkGrep(dir, out = []){
+  for (const entry of await readdir(dir, { withFileTypes: true })){
+    const path = join(dir, entry.name);
+    if (entry.isDirectory()){
+      if (!SKIP_DIRS.has(entry.name)) await walkGrep(path, out);
+      continue;
+    }
+    if (!entry.isFile() || (await stat(path)).size > 2_000_000) continue;
+    const text = await readFile(path, 'utf8');
+    if (text.includes('\0')) continue;   // binary
+    text.split('\n').forEach((line, i) => {
+      if (LEFTOVER.test(line)) out.push(`${path.slice(root.length + 1)}:${i + 1}:${line}`);
+    });
+  }
+  return out.join('\n');
 }
 
 const commands = { diff, teardown };

@@ -1,7 +1,7 @@
 import { test, describe, beforeEach, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
 import { execFileSync, spawnSync } from 'node:child_process';
-import { writeFile } from 'node:fs/promises';
+import { writeFile, mkdir } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -61,5 +61,33 @@ describe('dial.mjs teardown', () => {
 
   test('rejects an unknown command', () => {
     assert.equal(run(project.root, 'nope').status, 2);
+  });
+});
+
+describe('dial.mjs teardown without git', () => {
+  let plain;
+  beforeEach(async () => { plain = await makeProject(); });   // no git init
+  afterEach(() => plain.cleanup());
+
+  test('a clean folder that is not a repo passes', () => {
+    const result = run(plain.root, 'teardown');
+    assert.equal(result.status, 0, result.stdout + result.stderr);
+    assert.match(result.stdout, /clean/);
+    assert.doesNotMatch(result.stderr, /fatal/);
+  });
+
+  test('finds leftovers by walking the files', async () => {
+    await mkdir(join(plain.root, 'src'));
+    await writeFile(join(plain.root, 'src', 'Card.tsx'), 'ok\nconst pad = "var(--dial-card-padding, 24px)"; // tweak-scaffold\n');
+    const result = run(plain.root, 'teardown');
+    assert.equal(result.status, 1);
+    assert.match(result.stdout, /src\/Card\.tsx:2:/);
+  });
+
+  test('skips node_modules', async () => {
+    await mkdir(join(plain.root, 'node_modules', 'pkg'), { recursive: true });
+    await writeFile(join(plain.root, 'node_modules', 'pkg', 'index.js'), '// data-tweak in a dependency\n');
+    const result = run(plain.root, 'teardown');
+    assert.equal(result.status, 0, result.stdout);
   });
 });
