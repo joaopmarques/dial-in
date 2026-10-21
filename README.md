@@ -1,5 +1,7 @@
 # 🎛️ dial-in
 
+[![skills.sh](https://www.skills.sh/b/joaopmarques/dial-in)](https://www.skills.sh/joaopmarques/dial-in)
+
 A Claude Code skill for the last 5% of a component. Some details you can only get right by eye: the radius, the shadow, the spring. Prompting for them one guess at a time is slow. Dial-in gives you sliders instead.
 
 Ask Claude to dial in a component. A panel of live controls opens next to it in your running app. Drag until it feels right, click **Send to agent**, and Claude writes the values back to source.
